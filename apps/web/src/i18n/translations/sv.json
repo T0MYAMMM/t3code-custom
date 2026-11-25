@@ -13017,5 +13017,12 @@
   "92e129bf413a1220": "återkallad",
   "384d0c30da9f9f2b": "Tillbaka till {model} · {effort}",
   "e898114f94a79aee": "Tillbaka till {model}",
-  "fcef94b45227b775": "Den senaste omgången körde på den, så dess promptcache gäller fortfarande."
+  "fcef94b45227b775": "Den senaste omgången körde på den, så dess promptcache gäller fortfarande.",
+  "03ce8e99ca1bd4f6": "aktuell",
+  "1def7da6605df6de": "Senaste trådar",
+  "2198161063f70e0b": "{position} av {count}",
+  "71f5b84a50483493": "Senaste trådar: nästa",
+  "8e36744e6d4d7f62": "Släpp för att öppna",
+  "d9041f8d03b37018": "Senaste trådar: föregående",
+  "e7439461a49ba8cf": "Aktuell"
 }

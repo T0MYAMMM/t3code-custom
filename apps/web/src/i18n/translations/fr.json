@@ -13010,5 +13010,12 @@
   "92e129bf413a1220": "retirée",
   "384d0c30da9f9f2b": "Revenir à {model} · {effort}",
   "e898114f94a79aee": "Revenir à {model}",
-  "fcef94b45227b775": "Le dernier tour l’a utilisé, donc son cache de prompt s’applique encore."
+  "fcef94b45227b775": "Le dernier tour l’a utilisé, donc son cache de prompt s’applique encore.",
+  "03ce8e99ca1bd4f6": "actuel",
+  "1def7da6605df6de": "Fils récents",
+  "2198161063f70e0b": "{position} sur {count}",
+  "71f5b84a50483493": "Fils récents : suivant",
+  "8e36744e6d4d7f62": "Relâchez pour ouvrir",
+  "d9041f8d03b37018": "Fils récents : précédent",
+  "e7439461a49ba8cf": "Actuel"
 }
