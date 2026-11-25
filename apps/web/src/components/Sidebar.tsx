@@ -951,7 +951,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   } = useSidebarLookups();
   const delegatedUnderParent = useDelegatedUnderParent();
   const router = useRouter();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, open: sidebarOpen, setOpen: setSidebarOpen } = useSidebar();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
@@ -1050,6 +1050,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   // Safari may click after Ctrl+click opens settings; suppress that selection until the picker reopens.
   const suppressNextScopeChangeRef = useRef(false);
   const highlightedProjectScopeKeyRef = useRef<string | null>(null);
+  // Closing the picker from the shortcut skips Base UI's keyboard close, so it restores no focus itself.
+  const projectScopeReturnFocusRef = useRef<HTMLElement | null>(null);
+  const projectScopeTriggerRef = useRef<HTMLButtonElement>(null);
   // Hold dropped rows until server placement is confirmed; block another pickup from replacing the hold.
   const [optimisticDrop, setOptimisticDrop] = useState<SidebarOptimisticDrop | null>(null);
   const threadSearchInputRef = useRef<HTMLInputElement>(null);
@@ -2987,7 +2990,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       handleThreadContextMenu(threadRef, position, source, true),
   );
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for thread navigation shortcuts using the current thread list
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to window keydown for thread navigation and project filter shortcuts
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || isCommandPaletteOpen() || isModelPickerOpen()) {
@@ -3009,6 +3012,27 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           navigateToThread(scopeThreadRef(targetThread.environmentId, targetThread.id));
         return true;
       };
+      if (command === "sidebar.projectFilter" && projectGroups.length > 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!projectScopeMenuState.open) {
+          if (isMobile) setOpenMobile(true);
+          else if (!sidebarOpen) setSidebarOpen(true);
+          suppressNextScopeChangeRef.current = false;
+          projectScopeReturnFocusRef.current =
+            document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          dispatchProjectScopeMenu({ type: "open-changed", open: true });
+          return;
+        }
+        dispatchProjectScopeMenu({ type: "open-changed", open: false });
+        const returnFocus = projectScopeReturnFocusRef.current;
+        projectScopeReturnFocusRef.current = null;
+        // The mobile sheet stays open, so focus must stay inside it.
+        const target = !isMobile && returnFocus?.isConnected ? returnFocus : null;
+        target?.focus();
+        if (document.activeElement !== target) projectScopeTriggerRef.current?.focus();
+        return;
+      }
       const traversalDirection = threadTraversalDirectionFromCommand(command);
       if (traversalDirection !== null) {
         navigateToRowKey(
@@ -3028,12 +3052,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     return () => window.removeEventListener("keydown", onWindowKeyDown);
   }, [
     draftIdByRowKey,
+    isMobile,
     keybindings,
     navigateToDraft,
     navigateToThread,
     orderedRowKeys,
+    projectGroups.length,
+    projectScopeMenuState.open,
+    projectScopeReturnFocusRef,
     routeRowKey,
     routeThreadRef,
+    setOpenMobile,
+    setSidebarOpen,
+    sidebarOpen,
     threadByKey,
   ]);
 
@@ -3088,6 +3119,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       ? shortcutLabelForCommand(keybindings, "chat.newLocal")
       : undefined);
   const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
+  const projectScopeLabel =
+    scopedProjectGroups.length > 0
+      ? gt("Projects: {projects}", {
+          projects: scopedProjectGroups.map((project) => project.displayName).join(", "),
+        })
+      : gt("Projects");
+  const projectScopeShortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.projectFilter");
   return (
     <SidebarFolderDrop>
       <SidebarChromeHeader isElectron={isElectron} />
@@ -3108,6 +3146,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   open={projectScopeMenuState.open}
                   onOpenChange={(open, eventDetails) => {
                     if (eventDetails.isCanceled) return;
+                    projectScopeReturnFocusRef.current = null;
                     if (open) suppressNextScopeChangeRef.current = false;
                     dispatchProjectScopeMenu({ type: "open-changed", open });
                   }}
@@ -3139,16 +3178,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                   }}
                 >
                   <ComboboxTrigger
+                    ref={projectScopeTriggerRef}
                     render={
                       <SidebarHeaderIconButton
-                        label={
-                          scopedProjectGroups.length > 0
-                            ? gt("Projects: {projects}", {
-                                projects: scopedProjectGroups
-                                  .map((project) => project.displayName)
-                                  .join(", "),
+                        label={projectScopeLabel}
+                        tooltip={
+                          projectScopeShortcutLabel
+                            ? gt("{label} ({shortcut})", {
+                                label: projectScopeLabel,
+                                shortcut: projectScopeShortcutLabel,
                               })
-                            : gt("Projects")
+                            : projectScopeLabel
                         }
                       />
                     }
