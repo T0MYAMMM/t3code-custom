@@ -269,6 +269,11 @@ import {
 } from "../composerDraftStore";
 import { useShownThreadRouteTarget } from "../hooks/useShownThreadRouteTarget";
 import {
+  SIDEBAR_LATEST_ACTIVITY_ENABLED,
+  sortThreadsByLatestActivity,
+  toggleProjectScope,
+} from "../custom/sidebarLatestActivity";
+import {
   SidebarSearchResultRow,
   SortableThreadRow,
   type SidebarProviderEntry,
@@ -460,7 +465,9 @@ function useSidebarThreads(input: {
   const shelfRouteThreadKey = routeRowThreadKey === departingThreadKey ? null : routeRowThreadKey;
   // Folders already separate the work, so boring mode has no Working shelf.
   const workingShelfEnabled =
-    useClientSettings((s) => s.sidebarWorkingShelfEnabled) && folderGroups === null;
+    useClientSettings((s) => s.sidebarWorkingShelfEnabled) &&
+    folderGroups === null &&
+    !SIDEBAR_LATEST_ACTIVITY_ENABLED;
   const inboxReturnsVersion = useSyncExternalStore(
     inboxReturns.subscribe,
     inboxReturns.getSnapshot,
@@ -702,9 +709,11 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const sortedPinned = sortPinnedThreadsForSidebar(pinned);
   const sortedActive = sortActiveBySend
     ? sortWorkingThreadsBySend(active)
-    : workingShelfEnabled
-      ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
-      : sortThreadsForSidebar(active);
+    : SIDEBAR_LATEST_ACTIVITY_ENABLED
+      ? sortThreadsByLatestActivity(active, new Set(input.connectedEnvironmentIds))
+      : workingShelfEnabled
+        ? sortInboxThreadsByReturn(active, inboxObservation.returnedAt)
+        : sortThreadsForSidebar(active);
   return {
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
@@ -1163,11 +1172,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
   const projectScopeKeys = revealWidensScope ? [] : chosenProjectScopeKeys;
   const projectScopeKey = projectScopeKeys.length === 0 ? null : projectScopeKeys.join("\n");
   const toggleProjectScopeKey = (key: string) =>
-    setProjectScopeKeys(
-      projectScopeKeys.includes(key)
-        ? projectScopeKeys.filter((candidate) => candidate !== key)
-        : [...projectScopeKeys, key],
-    );
+    setProjectScopeKeys(toggleProjectScope(projectScopeKeys, key));
   // The widened scope outlives the reveal, so it is written back to the persisted
   // scope. Route changes arrive from history, links and the palette, and only this
   // component holds the project groups that decide a widening, so no single
@@ -1193,8 +1198,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     (item) => item.value,
     projectScopeMenuState.open,
   );
+  // A project picker click toggles, so a selected project row must not be Base UI's value.
   const selectedProjectScopeItem =
-    projectScopeKeys.length > 1
+    projectScopeKeys.length > 1 || (SIDEBAR_LATEST_ACTIVITY_ENABLED && projectScopeKeys.length > 0)
       ? null
       : (projectScopeItems.find((item) => item.value === (projectScopeKeys[0] ?? "all")) ??
         projectScopeItems.find((item) => item.value === "all")!);
@@ -3121,8 +3127,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     } else if (item.value === "all") {
                       setProjectScopeKeys([]);
                     } else if (
-                      eventDetails.event instanceof MouseEvent &&
-                      eventDetails.event.shiftKey
+                      SIDEBAR_LATEST_ACTIVITY_ENABLED ||
+                      (eventDetails.event instanceof MouseEvent && eventDetails.event.shiftKey)
                     ) {
                       // Canceling skips Base UI's commit, which would freeze the search query, and its close.
                       eventDetails.cancel();
